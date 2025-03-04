@@ -2,6 +2,7 @@ services:
   - type: web
     name: user-auth-api
     env: node
+    plan: free  # ✅ This ensures you use a free tier
     buildCommand: npm install
     startCommand: node server.js
     envVars:
