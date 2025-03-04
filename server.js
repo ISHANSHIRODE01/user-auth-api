@@ -1,19 +1,20 @@
 require("dotenv").config();
 const express = require("express");
 const mysql = require("mysql2");
+const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const SECRET_KEY = process.env.JWT_SECRET || "your_secret_key"; // Change this in .env
+const SECRET_KEY = process.env.JWT_SECRET || "your_secret_key"; 
 
 // Middleware
 app.use(express.json());
 app.use(cors());
 
-// Create MySQL connection
+// MySQL Connection
 const db = mysql.createConnection({
   host: process.env.DB_HOST || "localhost",
   user: process.env.DB_USER || "root",
@@ -21,21 +22,30 @@ const db = mysql.createConnection({
   database: process.env.DB_NAME || "rest_api_db",
 });
 
-// Connect to MySQL
 db.connect((err) => {
   if (err) {
-    console.error("❌ Database connection failed:", err.message);
+    console.error("❌ MySQL connection failed:", err.message);
     return;
   }
   console.log("✅ Connected to MySQL Database");
 });
 
-// Home route
+// MongoDB Connection
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://ishanshirode:dbUSERishan@cluster0.cowct.mongodb.net/rest_api_db?retryWrites=true&w=majority";
+
+mongoose.connect(MONGO_URI)
+.then(() => console.log("✅ Connected to MongoDB"))
+.catch(err => console.error("❌ MongoDB connection failed:", err));
+
+// Import Product Model
+const Product = require("./models/Product");
+
+// Home Route
 app.get("/", (req, res) => {
-  res.send("🌍 Welcome to the REST API!");
+  res.send("🌍 Welcome to the REST API with MySQL & MongoDB!");
 });
 
-// Fetch all users
+// Fetch all users (MySQL)
 app.get("/users", (req, res) => {
   const sql = "SELECT * FROM users";
   db.query(sql, (err, results) => {
@@ -48,7 +58,7 @@ app.get("/users", (req, res) => {
   });
 });
 
-// Register User (Hash password)
+// Register User (MySQL)
 app.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
   
@@ -68,7 +78,7 @@ app.post("/register", async (req, res) => {
   });
 });
 
-// Login User (JWT Token)
+// Login User (JWT Token, MySQL)
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
   const sql = "SELECT * FROM users WHERE email = ?";
@@ -100,9 +110,33 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Protected Route Example
+// Protected Route (Example)
 app.get("/profile", authenticateToken, (req, res) => {
   res.json({ message: "Welcome to your profile!", userId: req.userId });
+});
+
+// MongoDB: Add Product
+app.post("/add-product", async (req, res) => {
+  try {
+    const { name, price, category } = req.body;
+    const newProduct = new Product({ name, price, category });
+    await newProduct.save();
+    res.json({ message: "Product added successfully", product: newProduct });
+  } catch (err) {
+    console.error("❌ Error adding product:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+// MongoDB: Fetch All Products
+app.get("/products", async (req, res) => {
+  try {
+    const products = await Product.find();
+    res.json(products);
+  } catch (err) {
+    console.error("❌ Error fetching products:", err);
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 // Start the server
